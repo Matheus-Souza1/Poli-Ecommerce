@@ -1,5 +1,0 @@
-{
-    "dbTest":"mongodb://localhost:27017ecommerce-api-test",
-    "dbProduction":"mongodb://localhost:27017/ecommerce-api"
-
-}

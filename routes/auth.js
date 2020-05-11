@@ -1,5 +1,5 @@
-const jwt = require('express-jwt');
-const secret = require('../config').secret;
+const jwt = require("express-jwt");
+const secret = require("../config").secret;
 
 function getTokenFromHeader(req){
     if(!req.headers.authorization) return null;
@@ -10,12 +10,12 @@ function getTokenFromHeader(req){
 
 const auth = {
     required: jwt({
-        secret, 
+        secret,
         userProperty: 'payload',
         getToken: getTokenFromHeader
     }),
     optional: jwt({
-        secret, 
+        secret,
         userProperty: 'payload',
         credentialsRequired: false,
         getToken: getTokenFromHeader
