@@ -2,8 +2,7 @@ const router = require("express").Router();
 const auth = require("../../auth");
 const UsuarioController = require("../../../controllers/UsuarioController");
 
-//const Validation = require("express-validation");
-//const { UsuarioValidation } = require("../../../controllers/validacoes/usuarioValidation");
+
 
 const usuarioController = new UsuarioController();
 
