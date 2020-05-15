@@ -74,7 +74,56 @@ class CategoriaController {
         }
     }
 
+    //CLIENTES //
 
+    //GET /:id/produtos
+    async showProdutos(req, res, next) {
+        const { offset, limit } = req.query;
+        try {
+            const produtos = await Produto.paginate(
+                { categoria: req.params.id },
+                { offset: Number(offset) || 0, limit: Number(limit) || 30 });
+            return res.send({ produtos });
+        } catch (e) {
+            next(e);
+        }
+    }
+
+    //PUT /:id/produtos
+    async updateProdutos(req, res, next) {
+
+        try {
+            const categoria = await Categoria.findById(req.params.id);
+            const { produtos } = req.body;
+            if (produtos) categoria.produtos = produtos;
+            await categoria.save();
+
+            let _produtos = await Produto.find({
+                $or: [
+                    { categoria: req.params.id },
+                    { _id: { $in: produtos } }
+                ]
+            });
+            _produtos = await Promise.all(_produtos.map(async (prod) => {
+                if (!produtos.includes(produto.categoria._id.toString())) {
+                    produto.categoria = null,
+                        await produto.save();
+                } else {
+                    produto.categoria = req.params.id
+                }
+                await produto.save();
+                return produto;
+            }));
+
+            const resultado = await Produto.paginate(
+                { categoria: req.params.id },
+                { offset: 0, limit: 30 });
+            return res.send({ produtos: resultado });
+
+        } catch (e) {
+            next(e);
+        }
+    }
 
 }
 
