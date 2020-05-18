@@ -22,4 +22,7 @@ router.get("/disponiveis", Validation(ProdutoValidation.indexDisponiveis), produ
 router.get("/search/:search", Validation(ProdutoValidation.search), produtoController.search);
 router.get("/:id", Validation(ProdutoValidation.show), produtoController.show);
 
+//AVALIACOES
+router.get("/:id/avaliacoes",Validation(ProdutoValidation.showAvaliacoes), produtoController.showAvaliacoes);
+
 module.exports = router;    
