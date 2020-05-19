@@ -8,6 +8,8 @@ const Entrega = mongoose.model("Entrega");
 const Cliente = mongoose.model("Cliente");
 const RegistroPedido = mongoose.model("RegistroPedido");
 
+const {calcularFrete} = require("./integracoes/correios");
+const EntregaValidation = require('./validacoes/entregaValidation');
 
 const CarrinhoValidation = require("./validacoes/carrinhoValidation");
 
@@ -136,8 +138,12 @@ class PedidoController {
                 item.variacao = await Variacao.findById(item.variacao);
                 return item;
             }));
-            const registros = await RegistroPedido.find({pedido: pedido._i})
-            return res.send({ pedido, registros }); 
+            const registros = await RegistroPedido.find({pedido: pedido._id})
+
+            const resultado = await calcularFrete({cep:"77809070", produtos: pedido.carrinho});
+
+
+            return res.send({ pedido }); 
         } catch (e) {
             next(e);
         }
@@ -150,10 +156,12 @@ class PedidoController {
         try {
 
             if (!await CarrinhoValidation(carrinho)) return res.status(422).send({ error: "Carrinho invalido" });
-            //if (!EntregaValidation(carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
+          
+            const cliente = await Cliente.findOne({ usuario: req.payload.id });
+
+            if (!EntregaValidation.checarValorPrazo(cliente.endereco.CEP, carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
             //if (!PagamentoValidation(carrinho, pagamento)) return res.status(422).send({ error: "Dados de pagamento invalido" });
 
-            const cliente = await Cliente.findOne({ usuario: req.payload.id });
             const novoPagamento = new Pagamento({
                 valor: pagamento.valor,
                 forma: pagamento.forma,
