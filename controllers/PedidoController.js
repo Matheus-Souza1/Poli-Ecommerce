@@ -8,8 +8,9 @@ const Entrega = mongoose.model("Entrega");
 const Cliente = mongoose.model("Cliente");
 const RegistroPedido = mongoose.model("RegistroPedido");
 
-const {calcularFrete} = require("./integracoes/correios");
+const { calcularFrete } = require("./integracoes/correios");
 const EntregaValidation = require('./validacoes/entregaValidation');
+const PagamentoValidation = require('./validacoes/pagamentoValidation');
 
 const CarrinhoValidation = require("./validacoes/carrinhoValidation");
 
@@ -51,7 +52,7 @@ class PedidoController {
                 item.variacao = await Variacao.findById(item.variacao);
                 return item;
             }));
-            const registros = await RegistroPedido.find({pedido: pedido._i})
+            const registros = await RegistroPedido.find({ pedido: pedido._i })
             return res.send({ pedido, registros });
         } catch (e) {
             next(e);
@@ -68,10 +69,10 @@ class PedidoController {
             const registroPedido = new RegistroPedido({
                 pedido: pedido._id,
                 tipo: "pedido",
-                situacao:"pedido_cancelado"
+                situacao: "pedido_cancelado"
             });
             await registroPedido.save();
-            
+
             //registro atividade
 
             await pedido.save();
@@ -138,12 +139,12 @@ class PedidoController {
                 item.variacao = await Variacao.findById(item.variacao);
                 return item;
             }));
-            const registros = await RegistroPedido.find({pedido: pedido._id})
+            const registros = await RegistroPedido.find({ pedido: pedido._id })
 
-            const resultado = await calcularFrete({cep:"77809070", produtos: pedido.carrinho});
+            const resultado = await calcularFrete({ cep: "77809070", produtos: pedido.carrinho });
 
 
-            return res.send({ pedido }); 
+            return res.send({ pedido });
         } catch (e) {
             next(e);
         }
@@ -152,21 +153,28 @@ class PedidoController {
     async store(req, res, next) {
         const { carrinho, pagamento, entrega } = req.body;
         const { loja } = req.query;
+        const _carrinho = carrinho.slice()
 
         try {
 
             if (!await CarrinhoValidation(carrinho)) return res.status(422).send({ error: "Carrinho invalido" });
-          
-            const cliente = await Cliente.findOne({ usuario: req.payload.id });
 
-            if (!EntregaValidation.checarValorPrazo(cliente.endereco.CEP, carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
-            //if (!PagamentoValidation(carrinho, pagamento)) return res.status(422).send({ error: "Dados de pagamento invalido" });
+            const cliente = await Cliente.findOne({ usuario: req.payload.id }).populate({path:"usuario", "select":"_id nome email"});
+
+            if (! await EntregaValidation.checarValorPrazo(cliente.endereco.CEP, carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
+            if (! await PagamentoValidation.checarValorTotal({ carrinho, entrega, pagamento })) return res.status(422).send({ error: "Dados de pagamento invalido" });
+            if (! await PagamentoValidation.checarCartao(pagamento)) return res.status(422).send({ error: "Dados de pagamento com cartao invalido" });
+
+
 
             const novoPagamento = new Pagamento({
                 valor: pagamento.valor,
+                parcelas: pagamento.parcelas || 1,
                 forma: pagamento.forma,
                 status: "Iniciando pagamento",
-                payload: pagamento,
+                endereco: pagamento.endereco,
+                cartao: pagamento.cartao,
+                enderecoEntregaIgualCobranca: pagamento.enderecoEntregaIgualCobranca,
                 loja
             });
 
@@ -175,13 +183,13 @@ class PedidoController {
                 custo: entrega.custo,
                 prazo: entrega, prazo,
                 tipo: entrega.tipo,
-                payload: entrega,
+                endereco: entrega.endereco,
                 loja
             });
 
             const pedido = new Pedido({
                 cliente: cliente._id,
-                carrinho,
+                carrinho: _carrinho,
                 pagamento: novoPagamento._id,
                 entrega: novaEntrega._id,
                 loja
@@ -197,7 +205,7 @@ class PedidoController {
             const registroPedido = new RegistroPedido({
                 pedido: pedido._id,
                 tipo: "pedido",
-                situacao:"pedido_criado"
+                situacao: "pedido_criado"
             });
             await registroPedido.save();
 
@@ -224,7 +232,7 @@ class PedidoController {
             const registroPedido = new RegistroPedido({
                 pedido: pedido._id,
                 tipo: "pedido",
-                situacao:"pedido_cancelado"
+                situacao: "pedido_cancelado"
             });
             await registroPedido.save();
 
