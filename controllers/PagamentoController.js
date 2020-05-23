@@ -7,6 +7,8 @@ const Produto = mongoose.model("Produto");
 const Variacao = mongoose.model("Variacao");
 const RegistroPedido = mongoose.model("RegistroPedido");
 
+const QuantidadeValidation = require('./validacoes/quantidadeValidation');
+
 const EmailController = require("./EmailController");
 
 class PagamentoController {
@@ -104,6 +106,9 @@ class PagamentoController {
 
             await pagamento.save();
 
+            if (status.toLowerCase().includes("pago")) await QuantidadeValidation.atualizarQuantidade("confirmar_pedido", pedido);
+            else if (status.toLowerCase().includes("cancelado")) await QuantidadeValidation.atualizarQuantidade("cancelar_pedido", pedido);
+
             return res.send({ pagamento })
 
         } catch (e) {
@@ -156,6 +161,10 @@ class PagamentoController {
                     status: situacao.status,
                     data: new Date()
                 });
+
+                if (status.toLowerCase().includes("pago")) await QuantidadeValidation.atualizarQuantidade("confirmar_pedido", pedido);
+                else if (status.toLowerCase().includes("cancelado")) await QuantidadeValidation.atualizarQuantidade("cancelar_pedido", pedido);
+
             }
             return res.send({ success: true });
 

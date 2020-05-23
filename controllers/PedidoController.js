@@ -12,6 +12,7 @@ const RegistroPedido = mongoose.model("RegistroPedido");
 const { calcularFrete } = require("./integracoes/correios");
 const EntregaValidation = require('./validacoes/entregaValidation');
 const PagamentoValidation = require('./validacoes/pagamentoValidation');
+const QuantidadeValidation = require('./validacoes/quantidadeValidation');
 
 const EmailController = require("./EmailController");
 
@@ -79,6 +80,8 @@ class PedidoController {
             EmailController.cancelarPedido({ usuario: pedido.cliente.usuario, pedido });
 
             await pedido.save();
+
+            await  QuantidadeValidation.atualizarQuantidade("cancelar_pedido", pedido);
 
             return res.send({ cancelado: true });
 
@@ -164,6 +167,8 @@ class PedidoController {
 
             const cliente = await Cliente.findOne({ usuario: req.payload.id }).populate({ path: "usuario", "select": "_id nome email" });
 
+            if(!await QuantidadeValidation.validarQuantidadeDisponivel(carrinho)) return res.status(400).send({error:"Produtos nao tem quantidade disponivel"})
+
             if (! await EntregaValidation.checarValorPrazo(cliente.endereco.CEP, carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
             if (! await PagamentoValidation.checarValorTotal({ carrinho, entrega, pagamento })) return res.status(422).send({ error: "Dados de pagamento invalido" });
             if (! await PagamentoValidation.checarCartao(pagamento)) return res.status(422).send({ error: "Dados de pagamento com cartao invalido" });
@@ -204,6 +209,8 @@ class PedidoController {
             await pedido.save();
             await novoPagamento.save();
             await novaEntrega.save();
+
+            await  QuantidadeValidation.atualizarQuantidade("salvar_pedido", pedido);
 
             const registroPedido = new RegistroPedido({
                 pedido: pedido._id,
@@ -249,6 +256,8 @@ class PedidoController {
             });
 
             await pedido.save();
+
+            await  QuantidadeValidation.atualizarQuantidade("cancelar_pedido", pedido);
 
             return res.send({ cancelado: true });
 
