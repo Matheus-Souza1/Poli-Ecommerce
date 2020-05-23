@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Pedido = mongoose.model("Pedido");
 
+const Usuario = mongoose.model("Usuario");
 const Produto = mongoose.model("Produto");
 const Variacao = mongoose.model("Variacao");
 const Pagamento = mongoose.model("Pagamento");
@@ -11,6 +12,8 @@ const RegistroPedido = mongoose.model("RegistroPedido");
 const { calcularFrete } = require("./integracoes/correios");
 const EntregaValidation = require('./validacoes/entregaValidation');
 const PagamentoValidation = require('./validacoes/pagamentoValidation');
+
+const EmailController = require("./EmailController");
 
 const CarrinhoValidation = require("./validacoes/carrinhoValidation");
 
@@ -62,7 +65,7 @@ class PedidoController {
     //DELETE /admin/:id  removeAdmin
     async removeAdmin(req, res, next) {
         try {
-            const pedido = await Pedido.findOne({ loja: req.query.loja, _id: req.params.id });
+            const pedido = await (await Pedido.findOne({ loja: req.query.loja, _id: req.params.id })).populate({ path: "cliente", populate: { path: "usuario" } });
             if (!pedido) return res.status(400).send({ error: "Pedido nao encontrado" });
             pedido.cancelado = true;
 
@@ -73,7 +76,7 @@ class PedidoController {
             });
             await registroPedido.save();
 
-            //registro atividade
+            EmailController.cancelarPedido({ usuario: pedido.cliente.usuario, pedido });
 
             await pedido.save();
 
@@ -159,7 +162,7 @@ class PedidoController {
 
             if (!await CarrinhoValidation(carrinho)) return res.status(422).send({ error: "Carrinho invalido" });
 
-            const cliente = await Cliente.findOne({ usuario: req.payload.id }).populate({path:"usuario", "select":"_id nome email"});
+            const cliente = await Cliente.findOne({ usuario: req.payload.id }).populate({ path: "usuario", "select": "_id nome email" });
 
             if (! await EntregaValidation.checarValorPrazo(cliente.endereco.CEP, carrinho, entrega)) return res.status(422).send({ error: "Dados de entrega invalido" });
             if (! await PagamentoValidation.checarValorTotal({ carrinho, entrega, pagamento })) return res.status(422).send({ error: "Dados de pagamento invalido" });
@@ -209,7 +212,11 @@ class PedidoController {
             });
             await registroPedido.save();
 
-            //Notificar via email
+            EmailController.enviarNovoPedido({ pedido, usuario: cliente.usuario });
+            const administradores = await Usuario.find({ permissao: "admin", loja });
+            administradores.forEach((usuario) => {
+                EmailController.cancelarPedido({ pedido, usuario });
+            });
 
             return res.send({ pedido: Object.assign({}, pedido._doc, { entrega: novaEntrega, pagamento: novoPagamento, cliente }) })
 
@@ -236,7 +243,10 @@ class PedidoController {
             });
             await registroPedido.save();
 
-            //registro atividade
+            const administradores = await Usuario.find({ permissao: "admin", loja: pedido.loja });
+            administradores.forEach((usuario) => {
+                EmailController.cancelarPedido({ pedido, usuario });
+            });
 
             await pedido.save();
 
